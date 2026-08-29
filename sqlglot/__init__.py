@@ -51,6 +51,7 @@ from sqlglot.expressions import (
 )
 from sqlglot.generator import Generator as Generator
 from sqlglot.parser import Parser as Parser
+from sqlglot.column_policy import ColumnPolicy as ColumnPolicy
 from sqlglot.schema import MappingSchema as MappingSchema, Schema as Schema
 from sqlglot.tokens import Token as Token, Tokenizer as Tokenizer, TokenType as TokenType
 
