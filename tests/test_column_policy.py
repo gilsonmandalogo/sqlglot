@@ -14,6 +14,47 @@ class TestColumnPolicy(unittest.TestCase):
         self.assertTrue(from_map.covers("orders.ssn"))
         self.assertFalse(from_list.covers("users.name"))
 
+    def test_mapping_retains_actions(self):
+        policy = ColumnPolicy(
+            {
+                "users.email": "MASK",
+                "users.ssn": " Drop ",
+                "users.notes": "audit",
+                "users.flag": True,
+                "users.skip": None,
+                "users.off": False,
+            }
+        )
+
+        self.assertTrue(policy.covers("users.email"))
+        self.assertTrue(policy.covers("users.ssn"))
+        self.assertTrue(policy.covers("users.notes"))
+        self.assertTrue(policy.covers("users.flag"))
+        self.assertTrue(policy.covers("users.skip"))
+        self.assertTrue(policy.covers("users.off"))
+
+        self.assertEqual(policy.action("users.email"), "mask")
+        self.assertEqual(policy.action("users.ssn"), "drop")
+        self.assertEqual(policy.action("users.notes"), "audit")
+        self.assertEqual(policy.action("users.flag"), "true")
+        self.assertIsNone(policy.action("users.skip"))
+        self.assertIsNone(policy.action("users.off"))
+        self.assertIsNone(policy.action("users.name"))
+
+        # Right-aligned matching matches covers()
+        self.assertEqual(policy.action("catalog.db.users.email"), "mask")
+
+        self.assertEqual(policy.entries_with_action("mask"), [("users", "email")])
+        self.assertEqual(sorted(policy.entries_with_action("drop")), [("users", "ssn")])
+
+    def test_list_entries_have_no_action(self):
+        policy = ColumnPolicy(["users.email", "orders.ssn"])
+
+        self.assertTrue(policy.covers("users.email"))
+        self.assertIsNone(policy.action("users.email"))
+        self.assertIsNone(policy.action("orders.ssn"))
+        self.assertEqual(policy.entries_with_action("drop"), [])
+
     def test_add_and_contains(self):
         policy = ColumnPolicy()
         policy.add("users.email").add("users.phone")

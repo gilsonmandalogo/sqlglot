@@ -26,13 +26,16 @@ class ColumnPolicy:
     ) -> None:
         self._dialect: Dialect = Dialect.get_or_raise(dialect)
         self._entries: set[tuple[str, ...]] = set()
+        self._actions: dict[tuple[str, ...], str | None] = {}
 
         if columns is None:
             return
 
         if isinstance(columns, Mapping):
-            for name in columns:
+            for name, value in columns.items():
                 self.add(name)
+                parts = self._normalize_column_parts(name)
+                self._actions[parts] = self._normalize_action(value)
         else:
             for name in columns:
                 self.add(name)
@@ -85,6 +88,28 @@ class ColumnPolicy:
             return False
 
         return any(self._matches(entry, query) for entry in self._entries)
+
+    def action(self, path: str | exp.Column, dialect: DialectType = None) -> str | None:
+        """
+        Return the action tag for a covered column path, or ``None`` if the path
+        is not covered or has no associated action.
+
+        Uses the same right-aligned matching as :meth:`covers`. List-constructed
+        entries have no action and yield ``None``.
+        """
+        query = self._normalize_column_parts(path, dialect=dialect)
+        if len(query) < 2:
+            return None
+
+        for entry, act in self._actions.items():
+            if self._matches(entry, query):
+                return act
+        return None
+
+    def entries_with_action(self, action: str) -> list[tuple[str, ...]]:
+        """Return entry paths whose stored action equals ``action`` (case-insensitive)."""
+        normalized = action.strip().lower()
+        return [entry for entry, act in self._actions.items() if act == normalized]
 
     def __contains__(self, item: object) -> bool:
         if not isinstance(item, (str, exp.Column)):
@@ -153,6 +178,14 @@ class ColumnPolicy:
             for part in expression.parts
             if isinstance(part, exp.Identifier)
         )
+
+    @staticmethod
+    def _normalize_action(value: t.Any) -> str | None:
+        if isinstance(value, str):
+            return value.strip().lower()
+        if value is None or value is False:
+            return None
+        return str(value).strip().lower()
 
     @staticmethod
     def _matches(entry: tuple[str, ...], query: tuple[str, ...]) -> bool:
